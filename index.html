@@ -332,8 +332,8 @@ function equipment(sc){
    panel('Readings',fmt(cur.d)+(cur===lr?' (latest)':''),mxTable(hist,cur)+`<p class="note">Velocity cells turn amber at or above ${S.alert} mm/s and red at or above ${S.danger} mm/s. Change the limits beside the chart.</p>`+
      (cur.obs>=0||cur.rec>=0?`<div class="tx">${cur.obs>=0?'<b class="ob1">Observations</b>'+esc(tx(cur.obs)):''}${cur.rec>=0?'<b class="rc1">Recommendations</b>'+esc(tx(cur.rec)):''}</div>`:'')+(cur.obs<0?'<span class="hint">No observations recorded for this inspection.</span>':'')+(cur.rec<0?'<span class="hint">No recommendation recorded</span>':''))+
    panel('Trend','',`<div class="row2" style="margin:0 0 8px"><div style="flex:2"><label class="lbl">Measure</label><select class="fld" id="metricSel">${sel('vel','Peak velocity (mm/s)')}${sel('h','Horizontal velocity')}${sel('v','Vertical velocity')}${sel('a','Axial velocity')}${sel('g','gE (bearing condition)')}</select></div><div><label class="lbl">Alert</label><input class="fld" type="number" id="thrA" step="0.1" min="0" value="${S.alert}"></div><div><label class="lbl">Danger</label><input class="fld" type="number" id="thrD" step="0.1" min="0" value="${S.danger}"></div></div>`+lineChart(hr,pts))+
-   panel('Inspection history','Every reading of each inspection. H, V and A are horizontal, vertical and axial velocity in mm/s, gE is bearing condition. Select a row to load it above.',
-     hs.length?shown.map(r=>`<div class="hi s${r.s}${r===cur?' sel':''}"><div class="h1"><b>${fmt(r.d)}</b>${pill(r.s)}</div>`+pts.map(p=>`<div class="pl"><b style="color:var(--p${p+1})">${PT[p]}</b> H ${vv(r.x[p*4])} V ${vv(r.x[p*4+1])} A ${vv(r.x[p*4+2])} gE <b>${n1(r.x[p*4+3])}</b></div>`).join('')+(r.ins>=0?`<div class="pl"><b>Inspector</b> ${esc(tx(r.ins))}</div>`:'')+notes(r,false,'Observations and recommendations')+`<button class="ld" data-act="pick" data-i="${r.i}">Load into Readings</button></div>`).join('')+(hs.length>15&&!S.hAll?`<button class="big" style="margin-top:10px" data-act="hall">Show all ${hs.length} inspections</button>`:''):'<span class="hint">No inspections in this date range.</span>');
+   (A?panel('Inspection history','Every reading of each inspection. H, V and A are horizontal, vertical and axial velocity in mm/s, gE is bearing condition. Select a row to load it above.',
+     hs.length?shown.map(r=>`<div class="hi s${r.s}${r===cur?' sel':''}"><div class="h1"><b>${fmt(r.d)}</b>${pill(r.s)}</div>`+pts.map(p=>`<div class="pl"><b style="color:var(--p${p+1})">${PT[p]}</b> H ${vv(r.x[p*4])} V ${vv(r.x[p*4+1])} A ${vv(r.x[p*4+2])} gE <b>${n1(r.x[p*4+3])}</b></div>`).join('')+(r.ins>=0?`<div class="pl"><b>Inspector</b> ${esc(tx(r.ins))}</div>`:'')+notes(r,false,'Observations and recommendations')+`<button class="ld" data-act="pick" data-i="${r.i}">Load into Readings</button></div>`).join('')+(hs.length>15&&!S.hAll?`<button class="big" style="margin-top:10px" data-act="hall">Show all ${hs.length} inspections</button>`:''):'<span class="hint">No inspections in this date range.</span>'):'');
 }
 
 /* ---------- inspection log (admin) ---------- */
@@ -443,8 +443,8 @@ window.addEventListener('afterprint',()=>{document.title=baseTitle});
 
 /* ---------- sign-in ---------- */
 async function sha(s){const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s));return[...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')}
-function role(a){A=a;document.body.classList.toggle('guest',!a);$('userInfo').textContent=a?'Admin':'Guest';$('ov').hidden=true;try{sessionStorage.setItem('vdrole',a?'a':'g')}catch(e){}if(!a&&(S.tab==='log'||S.tab==='report'))S.tab='overview';render()}
-function lock(){try{sessionStorage.removeItem('vdrole')}catch(e){}$('l1').hidden=false;$('l2').hidden=true;$('pw').value='';$('lerr').textContent='';$('ov').hidden=false}
+function role(a){A=a;document.body.classList.toggle('guest',!a);$('userInfo').textContent=a?'Admin':'Guest';$('ov').hidden=true;if(!a&&(S.tab==='log'||S.tab==='report'))S.tab='overview';render()}
+function lock(){$('l1').hidden=false;$('l2').hidden=true;$('pw').value='';$('lerr').textContent='';$('ov').hidden=false}
 $('rA').onclick=()=>{$('l1').hidden=true;$('l2').hidden=false;$('pw').focus()};$('rG').onclick=()=>role(false);$('lbk').onclick=lock;$('swBtn').onclick=lock;
 async function tryA(){try{if((await sha($('pw').value))===ADMIN_H)role(true);else{$('lerr').textContent='Wrong password. Try again.';$('pw').select()}}catch(e){$('lerr').textContent='Admin sign-in needs a secure (https) page.'}}
 $('lgo').onclick=tryA;$('pw').addEventListener('keydown',e=>{if(e.key==='Enter')tryA()});
@@ -456,7 +456,7 @@ async function load(){$('rf').disabled=true;let note='';
     note='vd-data.js was not found next to this page, so older snapshot data is shown.'}catch(err){note='vd-data.js could not be read ('+(err&&err.message||err)+'), so older snapshot data is shown.'}
   if(SNAP){setData(SNAP,'the snapshot saved in this file');render(true);$('main').insertAdjacentHTML('afterbegin',`<div class="err">${esc(note)}</div>`)}else $('main').innerHTML=`<div class="err">${esc(note)}</div>`;$('rf').disabled=false}
 $('rf').onclick=load;document.addEventListener('visibilitychange',()=>{if(!document.hidden&&D&&Date.now()-(load.t||0)>6e4){load.t=Date.now();load()}});
-try{const r=sessionStorage.getItem('vdrole');if(r)role(r==='a')}catch(e){}
+window.addEventListener('pageshow',e=>{if(e.persisted)lock()});
 load.t=Date.now();load();
 })();
 </script>
