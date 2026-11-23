@@ -1,5 +1,5 @@
 window.VD_EXPORT = {
-exportedAt: "23 Nov 2026 11:38",
+exportedAt: "23 Nov 2026 12:27",
 sheet: "InsDataR",
 rows: [
 ["Equipment Name","Link","Report#","Date","Area","Discharge Pressure ","RPM","Motor Bearings","H\nMNDE","V\nMNDE","A\nMNDE","gE's\nMNDE","Temp.\nMNDE","H\nMDE","V\nMDE","A\nMDE","gE's\nMDE","Temp. \nMDE","H\nPDE","V\nPDE","A\nPDE","gE's\nPDE","Temp.\nPDE","H\nPNDE","V\nPNDE","A\nPNDE","gE's\nPNDE","Temp.\nPNDE","Status","Inspected by","Observations","Recommendations","Plant Status","Plant Feed","Crude ","Status Rating"],
