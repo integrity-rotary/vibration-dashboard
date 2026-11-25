@@ -86,6 +86,25 @@ svg.ch{width:100%;height:auto;display:block;touch-action:pan-y}.ch text{fill:var
 .err{background:color-mix(in srgb,var(--s3) 25%,var(--sf));border:1px solid var(--s3);border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:13.5px}
 .guest .dock [data-admin]{display:none}
 @media print{.top,.fl,.stk,.dock,.noprint,#sh,#ov,body::before{display:none!important}main{padding:0;max-width:none}.cd,.hi,details.pn{break-inside:avoid}body{background:#fff}}
+.fm{display:flex;align-items:center;gap:6px;margin-top:2px;font-size:12px}.fm span{flex:none;width:66px;white-space:nowrap;color:var(--ink3)}.fm .tr{flex:1;height:8px;margin-top:0}.fm b{flex:none;width:22px;text-align:right}.fb .tr i.m0{opacity:.45}.fb .tr i.m1{opacity:.72}
+@media print{
+@page{size:A4;margin:9mm}
+html,body{width:auto;font-size:11px;line-height:1.3}
+main{padding:0!important;max-width:none!important;margin:0}
+#repOut{border:0!important;box-shadow:none!important;padding:0!important;background:#fff;border-radius:0}
+#repOut .rhd{margin-bottom:3px}#repOut .rhd h2{font-size:18px}
+#repOut .g2{grid-template-columns:repeat(5,1fr);gap:4px;margin-top:4px}#repOut .g2 div{padding:3px 6px;border:1px solid var(--line);background:#fff}#repOut .g2 dt{font-size:8.5px}#repOut .g2 dd{font-size:11px}
+#repOut .rsec{font-size:12px;margin:7px 0 3px;padding-top:0;break-after:avoid}
+#repOut .rk{grid-template-columns:repeat(4,1fr);gap:4px;margin:3px 0}#repOut .rk div{padding:3px 7px;break-inside:avoid}#repOut .rk span{font-size:8.5px}#repOut .rk b{font-size:14px}
+#repOut .scx{overflow:visible}#repOut table.mx{width:100%;font-size:10.5px}#repOut table.mx th,#repOut table.mx td{padding:2px 4px}
+#repOut .tx{font-size:10.5px;line-height:1.3;margin-top:4px}
+#repOut .hint,#repOut .note{font-size:9px;margin:2px 0}
+#repOut .spark{margin:2px 0 3px}#repOut .spark i{width:10px;height:10px}
+#repOut svg.ch{width:100%;height:auto;max-height:58mm}
+#repOut .info{display:none}#repOut .lgd{font-size:9.5px;margin-top:1px}
+#repOut details>summary{display:none}
+#repOut .cd{break-inside:avoid}
+}
 </style>
 </head>
 <body data-tab="overview">
@@ -182,7 +201,7 @@ const pill=s=>`<span class="pill s${s}"><i></i>${SN[s]}</span>`;
 const ago=d=>d<=0?'same day as latest survey':d===1?'1 day earlier':d+' days earlier';
 const S={tab:'overview',per:'12m',from:null,to:null,areas:new Set(),wl:'attention',minor:false,pSort:'plant',pRev:false,eq:null,eqRow:null,metric:'vel',alert:4.5,danger:7.1,hF:null,hT:null,
   lq:'',ls:new Set(),lSort:{k:'d',dir:-1},lp:0};
-const RUN=['Routine inspection','Solo Run','OST','Test Run'];let PTR=null;
+const RUN=['Routine inspection','Solo Run','OST','Test Run'];let PTR=null,PR=false;
 function drvGet(e){let m={};try{m=JSON.parse(localStorage.getItem('vdDrive')||'{}')||{}}catch(x){m={}}const o=m[nm(e)]||{};return{driver:o.driver==='turbine'?'turbine':'motor',driven:o.driven==='fan'?'fan':'pump'}}
 function drvSet(e,k,v){let m={};try{m=JSON.parse(localStorage.getItem('vdDrive')||'{}')||{}}catch(x){m={}}const o=Object.assign({},m[nm(e)]||{});o[k]=v;m[nm(e)]=o;try{localStorage.setItem('vdDrive',JSON.stringify(m))}catch(x){}}
 function drvInfo(e){const d=drvGet(e),t=d.driver==='turbine',f=d.driven==='fan';return{dn:t?'Turbine':'Motor',pn:f?'Fan':'Pump',lab:(t?['TNDE','TDE']:['MNDE','MDE']).concat(f?['FDE','FNDE']:['PDE','PNDE']),text:(t?'Turbine':'Motor')+' driven '+(f?'fan':'pump')}}
@@ -265,7 +284,8 @@ function overview(sc){
 
 /* ---------- watchlist ---------- */
 function watch(sc){
-  const V=[['attention','Corrective action required','s3'],['obs','Under observation','s2'],['repeat','Bad Actors','s4'],['pend','Pending equipment','s0']];
+  if(S.wl==='pend'&&!A)S.wl='attention';
+  const V=[['attention','Corrective action required','s3'],['obs','Under observation','s2'],['repeat','Bad Actors','s4'],['pend','Pending equipment','s0']].filter(v=>v[0]!=='pend'||A);
   let h=`<div class="chips">${V.map(v=>`<button class="chip ${v[2]}" data-act="wl" data-v="${v[0]}" aria-pressed="${S.wl===v[0]}"><i></i>${v[1]}</button>`).join('')}</div>`,b='';
   if(S.wl==='attention'){
     const minS=S.minor?2:3,l=[...sc.lat.values()].filter(r=>r.s>=minS).sort(cmpPl),hs=new Map();sc.rows.forEach(r=>{let a=hs.get(r.e);if(!a){a=[];hs.set(r.e,a)}a.push(r.s)});
@@ -292,20 +312,21 @@ function watch(sc){
 }
 
 /* ---------- equipment ---------- */
-function lineChart(hist,pts){
-  const m=S.metric,isV=m!=='g';
+function lineChart(hist,pts,o){
+  o=o||{};const m=o.m||S.metric,isV=m!=='g',lim=o.lim||null;
   const val=(r,p)=>{const x=r.x;if(m==='g')return x[p*4+3];if(m==='h')return x[p*4];if(m==='v')return x[p*4+1];if(m==='a')return x[p*4+2];let b=null;for(let k=0;k<3;k++){const v=x[p*4+k];if(v!=null&&(b==null||v>b))b=v}return b};
   const sets=pts.map(p=>({p,d:hist.map(r=>({x:r.d,y:val(r,p)})).filter(o=>o.y!=null)})).filter(s=>s.d.length);
   if(!sets.length)return empty('Nothing to show',hist.length?'This machine has no readings for the selected measure.':'No inspections in the selected date range.');
-  const W=340,H=220,L=30,Rr=8,T=10,B=22;let top=0;sets.forEach(s=>s.d.forEach(o=>{if(o.y>top)top=o.y}));
-  const ymax=isV?Math.max(top,S.danger)*1.12:(top||1)*1.15,x0=hist[0].d,x1=hist[hist.length-1].d,span=Math.max(1,x1-x0),X=d=>L+(d-x0)/span*(W-L-Rr),Y=v=>T+(1-v/ymax)*(H-T-B);
-  let s=`<svg class="ch" viewBox="0 0 ${W} ${H}" role="img" aria-label="Vibration trend">`;
+  const W=o.W||340,H=o.H||220,L=30,Rr=8,T=10,B=22;let top=0;sets.forEach(s=>s.d.forEach(o=>{if(o.y>top)top=o.y}));
+  const ymax=isV?Math.max(top,S.danger)*1.12:lim?Math.max(top,lim[lim.length-1][0])*1.12:(top||1)*1.15,x0=hist[0].d,x1=hist[hist.length-1].d,span=Math.max(1,x1-x0),X=d=>L+(d-x0)/span*(W-L-Rr),Y=v=>T+(1-v/ymax)*(H-T-B);
+  let s=`<svg class="ch" viewBox="0 0 ${W} ${H}" role="img" aria-label="${o.m==='g'?'gE trend':'Vibration trend'}">`;
   for(let i=0;i<=4;i++){const v=ymax*i/4;s+=`<line class="gl" x1="${L}" x2="${W-Rr}" y1="${Y(v)}" y2="${Y(v)}"/><text x="${L-4}" y="${Y(v)+3}" text-anchor="end">${Math.round(v*10)/10}</text>`}
   const a=mIdx(x0),b=mIdx(x1),st=Math.max(1,Math.ceil((b-a+1)/4));for(let k=a+1;k<=b;k+=st)s+=`<text x="${X(mStart(k))}" y="${H-6}" text-anchor="middle">${MON[k%12]} ${String(Math.floor(k/12)).slice(2)}</text>`;
   if(isV)s+=`<line x1="${L}" x2="${W-Rr}" y1="${Y(S.alert)}" y2="${Y(S.alert)}" style="stroke:var(--s2)" stroke-width="1.6" stroke-dasharray="5 3"/><line x1="${L}" x2="${W-Rr}" y1="${Y(S.danger)}" y2="${Y(S.danger)}" style="stroke:var(--s4)" stroke-width="1.6" stroke-dasharray="5 3"/>`;
+  if(lim)lim.forEach((q,i)=>{s+=`<line x1="${L}" x2="${W-Rr}" y1="${Y(q[0])}" y2="${Y(q[0])}" style="stroke:var(--s${i?4:2})" stroke-width="1.6" stroke-dasharray="5 3"/>`});
   sets.forEach(o=>{s+=`<polyline fill="none" style="stroke:var(--p${o.p+1})" stroke-width="2" stroke-linejoin="round" points="${o.d.map(q=>X(q.x).toFixed(1)+','+Y(q.y).toFixed(1)).join(' ')}"/>`+(o.d.length<60?o.d.map(q=>`<circle cx="${X(q.x).toFixed(1)}" cy="${Y(q.y).toFixed(1)}" r="2.6" style="fill:var(--p${o.p+1})"/>`).join(''):'')});
-  CH={hist,pts,val,x0,span,W,L,R:Rr};
-  return s+`<line id="cx" y1="${T}" y2="${H-B}" stroke-width="1" style="stroke:var(--ink3)" visibility="hidden"/></svg><div class="info" id="rd">Touch or drag across the chart to read values</div><div class="lgd">`+sets.map(o=>`<span><i style="background:var(--p${o.p+1})"></i>${(PTR||PT)[o.p]}</span>`).join('')+(isV?`<span><i style="background:var(--s2)"></i>Alert ${S.alert}</span><span><i style="background:var(--s4)"></i>Danger ${S.danger}</span>`:'')+'</div>';
+  if(!o.noscrub)CH={hist,pts,val,x0,span,W,L,R:Rr};
+  return s+(o.noscrub?'':`<line id="cx" y1="${T}" y2="${H-B}" stroke-width="1" style="stroke:var(--ink3)" visibility="hidden"/>`)+`</svg>`+(o.noscrub?'':`<div class="info" id="rd">Touch or drag across the chart to read values</div>`)+`<div class="lgd">`+sets.map(o=>`<span><i style="background:var(--p${o.p+1})"></i>${(PTR||PT)[o.p]}</span>`).join('')+(isV?`<span><i style="background:var(--s2)"></i>Alert ${S.alert}</span><span><i style="background:var(--s4)"></i>Danger ${S.danger}</span>`:'')+(lim?lim.map((q,i)=>`<span><i style="background:var(--s${i?4:2})"></i>${q[1]}</span>`).join(''):'')+'</div>';
 }
 function bindScrub(){const sv=document.querySelector('svg.ch');if(!sv||!CH)return;
   const mv=ev=>{const b=sv.getBoundingClientRect(),x=(ev.clientX-b.left)/b.width*CH.W,d=CH.x0+(x-CH.L)/(CH.W-CH.L-CH.R)*CH.span;let best=CH.hist[0];for(const r of CH.hist)if(Math.abs(r.d-d)<Math.abs(best.d-d))best=r;
@@ -324,7 +345,7 @@ function equipment(sc){
   const urgent=[...sc.lat.values()].filter(r=>r.s>=3).sort((a,b)=>b.s-a.s||(b.vm||0)-(a.vm||0)).slice(0,8).sort(cmpPl);
   let rpm=null;for(let i=hist.length-1;i>=0;i--)if(hist[i].rpm!=null){rpm=hist[i].rpm;break}
   const pts=ptsOf(hist),sel=(v,l)=>`<option value="${v}"${S.metric===v?' selected':''}>${l}</option>`;
-  const hs=hr.slice().reverse(),shown=S.hAll?hs:hs.slice(0,15);
+  const hs=hr.slice().reverse(),shown=S.hAll?hs:hs.slice(0,15),fcE=faultCounts(hr.filter(r=>r.s>=2));
   return`<input class="fld" id="eqIn" type="search" list="eql" value="${esc(nm(e))}" placeholder="Find a machine, for example 2GM-9" aria-label="Find a machine" autocomplete="off" style="height:46px">`+
    (urgent.length?`<div class="chips" style="margin-top:8px"><span class="hint" style="align-self:center;flex:none">Corrective action:</span>${urgent.map(r=>`<button type="button" class="chip s${r.s}" data-act="eq" data-e="${r.e}" aria-pressed="${r.e===e}"><i></i>${esc(nm(r.e))}</button>`).join('')}</div>`:'')+
    `<div class="cd s${lr.s}" style="margin-bottom:12px"><div class="eh"><h2>${esc(nm(e))}</h2>${pill(lr.s)}</div><dl class="g2">${kv('Area',esc(D.areas[lr.a]))}${kv('Speed',rpm!=null?rpm+' rpm':'–')}${kv('Inspections',hist.length+', since '+fmt(hMin))}${kv('Last inspected',fmt(lr.d))}</dl></div>`+
@@ -332,6 +353,7 @@ function equipment(sc){
    panel('Readings',fmt(cur.d)+(cur===lr?' (latest)':''),mxTable(hist,cur)+`<p class="note">Velocity cells turn amber at or above ${S.alert} mm/s and red at or above ${S.danger} mm/s. Change the limits beside the chart.</p>`+
      (cur.obs>=0||cur.rec>=0?`<div class="tx">${cur.obs>=0?'<b class="ob1">Observations</b>'+esc(tx(cur.obs)):''}${cur.rec>=0?'<b class="rc1">Recommendations</b>'+esc(tx(cur.rec)):''}</div>`:'')+(cur.obs<0?'<span class="hint">No observations recorded for this inspection.</span>':'')+(cur.rec<0?'<span class="hint">No recommendation recorded</span>':''))+
    panel('Trend','',`<div class="row2" style="margin:0 0 8px"><div style="flex:2"><label class="lbl">Measure</label><select class="fld" id="metricSel">${sel('vel','Peak velocity (mm/s)')}${sel('h','Horizontal velocity')}${sel('v','Vertical velocity')}${sel('a','Axial velocity')}${sel('g','gE (bearing condition)')}</select></div><div><label class="lbl">Alert</label><input class="fld" type="number" id="thrA" step="0.1" min="0" value="${S.alert}"></div><div><label class="lbl">Danger</label><input class="fld" type="number" id="thrD" step="0.1" min="0" value="${S.danger}"></div></div>`+lineChart(hr,pts))+
+    (A?panel('Fault-wise distribution','Minor, Moderate or Critical inspections in this date range',fcE.length?faultBars(fcE,0,1)+`<p class="note">Every inspection in the date range is counted by the faults named in its observations and recommendations. One inspection can count under more than one fault.</p>`:`<p class="note">No inspection was rated Minor or worse in this period.</p>`):'')+
    (A?panel('Inspection history','Every reading of each inspection. H, V and A are horizontal, vertical and axial velocity in mm/s, gE is bearing condition. Select a row to load it above.',
      hs.length?shown.map(r=>`<div class="hi s${r.s}${r===cur?' sel':''}"><div class="h1"><b>${fmt(r.d)}</b>${pill(r.s)}</div>`+pts.map(p=>`<div class="pl"><b style="color:var(--p${p+1})">${PT[p]}</b> H ${vv(r.x[p*4])} V ${vv(r.x[p*4+1])} A ${vv(r.x[p*4+2])} gE <b>${n1(r.x[p*4+3])}</b></div>`).join('')+(r.ins>=0?`<div class="pl"><b>Inspector</b> ${esc(tx(r.ins))}</div>`:'')+notes(r,false,'Observations and recommendations')+`<button class="ld" data-act="pick" data-i="${r.i}">Load into Readings</button></div>`).join('')+(hs.length>15&&!S.hAll?`<button class="big" style="margin-top:10px" data-act="hall">Show all ${hs.length} inspections</button>`:''):'<span class="hint">No inspections in this date range.</span>'):'');
 }
@@ -361,11 +383,10 @@ function repSingle(){
   let pv=null,pg=null;hist.forEach(r=>{if(r.vm!=null&&(!pv||r.vm>pv.vm))pv=r;if(r.gm!=null&&(!pg||r.gm>pg.gm))pg=r});let rpm=null;for(let i=all.length-1;i>=0;i--)if(all[i].rpm!=null){rpm=all[i].rpm;break}
   const DV=drvInfo(e);PTR=DV.lab;let dp=null;for(let i=all.length-1;i>=0;i--)if(all[i].dp!=null){dp=all[i].dp;break}
   const dpT=dp==null?'–':(typeof dp==='number'||/^[-\d.,\s]+$/.test(String(dp)))?(typeof dp==='number'?Math.round(dp*100)/100:esc(dp))+' psi':esc(dp);let insp=null;for(let i=hist.length-1;i>=0;i--)if(hist[i].ins>=0){insp=tx(hist[i].ins);break}
-  const fc=faultCounts(hist.filter(r=>r.s>=2));
   return hd+`<dl class="g2">${kv('Equipment',esc(nm(e)))}${kv('Area',esc(D.areas[cur.a]))}${kv('Speed',rpm!=null?rpm+' rpm':'–')}${kv('Inspected by',esc(insp||'–'))}${kv('Discharge pressure',dpT)}${kv('Report period',fmt(R.from)+' to '+fmt(R.to))}${kv('Prepared',today())}${kv('Inspection type',esc(R.run||RUN[0]))}${kv('Drive',DV.text)}</dl>`+
    `<h3 class="rsec">Summary</h3><div class="rk"><div style="--c:var(--s${cur.s})"><span>Latest status</span><b>${SN[cur.s]}</b></div><div><span>Inspections</span><b>${hist.length}</b> <small>(${mN} in ${MON[cm%12]} ${Math.floor(cm/12)})</small></div><div><span>Peak velocity</span><b>${n1(pv&&pv.vm)}</b> mm/s</div><div><span>Peak gE</span><b>${n1(pg&&pg.gm)}</b></div>`+[1,2,3,4].map(k=>`<div style="--c:var(--s${k})"><span>${SN[k]}</span><b>${cnt[k]}</b></div>`).join('')+`</div>`+
    `<h3 class="rsec">Latest readings, ${fmt(cur.d)}</h3>${mxTable(all,cur,DV)}<div class="tx">${cur.obs>=0?'<b class="ob1">Observations</b>'+esc(tx(cur.obs)):''}${cur.rec>=0?'<b class="rc1">Recommendations</b>'+esc(tx(cur.rec)):''}</div>`+
-   `<h3 class="rsec">Vibration trend</h3><div class="hint">Status of each inspection, oldest to newest</div><div class="spark">${hist.map(r=>`<i class="s${r.s}" title="${fmt(r.d)}: ${SN[r.s]}"></i>`).join('')}</div>${lineChart(hist,ptsOf(all))}<h3 class="rsec">Fault count</h3>`+(fc.length?faultBars(fc,0,1)+`<p class="note">Number of Minor, Moderate or Critical inspections in the report period whose observations or recommendations mention each fault. Normal inspections are not counted. Faults are read from keywords, so one inspection can count under more than one fault.</p>`:`<p class="note">No inspection was rated Minor or worse in this report period, so no fault is counted.</p>`);
+   `<h3 class="rsec">Vibration trend</h3><div class="hint">Status of each inspection, oldest to newest</div><div class="spark">${hist.map(r=>`<i class="s${r.s}" title="${fmt(r.d)}: ${SN[r.s]}"></i>`).join('')}</div>${lineChart(hist,ptsOf(all),PR?{W:640,H:165}:null)}<h3 class="rsec">gE trend</h3>${lineChart(hist,ptsOf(all),{m:'g',lim:[[1.5,'Alert 1.5'],[2,'Danger 2.0']],noscrub:1,W:PR?640:340,H:PR?165:220})}<p class="note">gE (bearing condition) at each measuring point. Alert 1.5 gE, danger 2.0 gE.</p>`;
 }
 function repMonthly(){
   const[yy,mm]=R.month.split('-').map(Number),f=Math.floor(Date.UTC(yy,mm-1,1)/864e5),t=Math.floor(Date.UTC(yy,mm,0)/864e5),ok=S.areas.size?a=>S.areas.has(a):()=>true,mname=new Date(Date.UTC(yy,mm-1,1)).toLocaleString('en-GB',{month:'long',year:'numeric',timeZone:'UTC'});
@@ -381,7 +402,9 @@ function repMonthly(){
   return hd+`<h3 class="rsec">Equipment Health and Trends</h3><div class="rk"><div><span>Machines inspected</span><b>${L.length}</b></div><div><span>Inspections</span><b>${rows.length}</b></div>`+[1,2,3,4].map(k=>`<div style="--c:var(--s${k})"><span>${SN[k]} (latest in month)</span><b>${cnt[k]}</b></div>`).join('')+`</div>`+
    `<p class="lbl">Equipment health</p><p class="hint">Latest status of ${pl(L.length,'machine')} inspected in ${mname}</p>${donut(cnt,L.length,0)}`+
    `<p class="lbl" style="margin-top:14px">Inspections by month</p><p class="hint">${M3[0].label} to ${M3[2].label}. Bars are inspections by status, the line is the share rated Minor or worse.</p>${monthChart(M3.map(d=>d.label),mc,'rm')}`+
-   `<p class="lbl" style="margin-top:14px">Area wise equipment status</p><p class="hint">Latest status by area in ${mname}</p>${areaBars(lt,'ra')}`+
+   (()=>{const fm=M3.map(d=>faultCounts(d.rs.filter(r=>r.s>=2))),all=new Map();fm.forEach(l=>l.forEach(([k,c])=>all.set(k,(all.get(k)||0)+c)));const names=[...all.keys()].sort((a,b)=>(a==='Others')-(b==='Others')||all.get(b)-all.get(a)),mx=Math.max(1,...fm.map(l=>Math.max(0,...l.map(x=>x[1]))));
+      return`<p class="lbl" style="margin-top:14px">Fault-wise distribution</p><p class="hint">Inspections rated Minor or worse in each month, ${M3[0].label} to ${M3[2].label}.</p>`+(names.length?names.map(k=>`<div class="fb ${k==='Others'?'oth':''}"><div class="t"><span>${esc(k)}</span></div>`+M3.map((d,i)=>{const c=(fm[i].find(x=>x[0]===k)||[0,0])[1];return`<div class="fm"><span>${d.label}</span><div class="tr"><i class="m${i}" style="width:${c/mx*100}%"></i></div><b>${c}</b></div>`}).join('')+`</div>`).join(''):`<p class="note">No inspection was rated Minor or worse in these three months.</p>`)})()+
+`<p class="lbl" style="margin-top:14px">Area wise equipment status</p><p class="hint">Latest status by area in ${mname}</p>${areaBars(lt,'ra')}`+
    `<h3 class="rsec">Legends</h3><table class="rl2"><tbody>${LEG.map(l=>`<tr><td class="lh s${l[0]}" style="--c:var(--s${l[0]})">${l[1]}</td><td>${l[2]}</td></tr>`).join('')}</tbody></table>`+
    sec('Corrective Action Required (Moderate or Critical)',4,corr,r=>`<div class="cd s${r.s}">${head(r)}<span class="sub">${fmt(r.d)}</span>${notes(r,true)}</div>`,'None.')+
    sec('Equipment Rectified',1,rect,x=>`<div class="cd s1">${head(x.r)}<dl class="g2">${kv('Before',pill(x.p.s)+'<br><small>'+fmt(x.p.d)+'</small>')}${kv('Now',pill(x.r.s)+'<br><small>'+fmt(x.r.d)+'</small>')}</dl>${notes(x.p,false,'Previous observation and recommendation (before rectification)')}</div>`,'None.')+
@@ -419,7 +442,7 @@ $('areaList').addEventListener('change',e=>{const i=+e.target.dataset.area;e.tar
 const ab=(a,id)=>{const c=a.dataset.c.split(',').map(Number);$(id).innerHTML=`<b>${esc(a.dataset.n||a.dataset.l)}</b><br>`+[1,2,3,4,0].filter(s=>c[s]).map(s=>`<span><i class="s${s}"></i>${SN[s]} ${c[s]}</span>`).join('')+(a.dataset.l?`<br>${pl(c.reduce((x,y)=>x+y,0),'inspection')}: ${Math.round((c[2]+c[3]+c[4])/Math.max(1,c.reduce((x,y)=>x+y,0))*1000)/10}% Minor or worse`:'')};
 $('main').addEventListener('click',e=>{const a=e.target.closest('[data-act]');if(!a)return;const v=a.dataset.act;
   if(v==='eq'){S.eq=+a.dataset.e;S.eqRow=null;S.hAll=false;S.hF=S.hT=null;go('equipment')}
-  else if(v==='wl'){S.wl=a.dataset.v;render(true)}else if(v==='minor'){S.minor=a.checked;render(true)}
+  else if(v==='wl'){if(a.dataset.v==='pend'&&!A)return;S.wl=a.dataset.v;render(true)}else if(v==='minor'){S.minor=a.checked;render(true)}
   else if(v==='pdir'){S.pRev=!S.pRev;render(true)}
   else if(v==='st'){const s=+a.dataset.s,l=[...scope().lat.values()].filter(r=>r.s===s).sort(cmpPl);sheet(SN[s]+' · '+pl(l.length,'machine'),l.length?l.map(r=>`<div class="cd s${r.s}">${head(r)}<dl class="g2">${vel(r)}${ge(r)}</dl></div>`).join(''):empty('Nothing to show'))}
   else if(v==='ab'||v==='mo')ab(a,a.dataset.id);
@@ -438,8 +461,8 @@ $('main').addEventListener('change',e=>{const t=e.target,id=t.id;
   else if(id==='repDriver'||id==='repDriven'){drvSet(R.eq,id==='repDriver'?'driver':'driven',t.value);render(true)}else if(id==='repRun'){R.run=t.value;render(true)}else if(id==='pSort'){S.pSort=t.value;S.pRev=false;render(true)}else if(id==='lSort'){S.lSort.k=t.value;S.lSort.dir=t.value==='d'||t.value==='s'||t.value==='vmax'||t.value==='gmax'?-1:1;S.lp=0;render(true)}});
 $('sh').addEventListener('click',e=>{if(e.target.closest('[data-close]')){$('sh').hidden=true;return}const a=e.target.closest('[data-act=eq]');if(a){$('sh').hidden=true;S.eq=+a.dataset.e;S.eqRow=null;S.hF=S.hT=null;go('equipment')}});
 const baseTitle=document.title;
-window.addEventListener('beforeprint',()=>{document.querySelectorAll('#repOut details').forEach(d=>d.open=true);if(S.tab==='report'&&R.mode==='single'&&R.gen&&R.eq!=null){const h=D.byEq[R.eq].filter(r=>r.d>=R.from&&r.d<=R.to);if(h.length){const l=h[h.length-1];document.title=(l.cc||nm(R.eq)+'_'+iso(l.d)).replace(/[\\/:*?"<>|]+/g,'-').trim()}}});
-window.addEventListener('afterprint',()=>{document.title=baseTitle});
+window.addEventListener('beforeprint',()=>{document.querySelectorAll('#repOut details').forEach(d=>d.open=true);if(S.tab==='report'&&R.mode==='single'&&R.gen&&$('repOut')){PR=true;$('repOut').innerHTML=repSingle();PR=false;PTR=null}if(S.tab==='report'&&R.mode==='single'&&R.gen&&R.eq!=null){const h=D.byEq[R.eq].filter(r=>r.d>=R.from&&r.d<=R.to);if(h.length){const l=h[h.length-1];document.title=(l.cc||nm(R.eq)+'_'+iso(l.d)).replace(/[\\/:*?"<>|]+/g,'-').trim()}}});
+window.addEventListener('afterprint',()=>{document.title=baseTitle;if(S.tab==='report'&&R.mode==='single'&&R.gen)render(true)});
 
 /* ---------- sign-in ---------- */
 async function sha(s){const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s));return[...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')}
